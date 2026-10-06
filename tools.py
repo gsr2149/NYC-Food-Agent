@@ -211,18 +211,115 @@ def suggest_cuisines(mood: str) -> dict:
     return {"mood": mood, "suggestions": ["ramen", "pho", "pizza"], "note": "STUB DATA"}
 
 
-def get_subway_trip(origin: str, destination: str) -> dict:
-    """Get subway directions and travel time between two NYC places.
+ROUTES_URL = "https://routes.googleapis.com/directions/v2:computeRoutes"
+ROUTES_FIELDS = ",".join([
+    "routes.duration",
+    "routes.legs.steps.travelMode",
+    "routes.legs.steps.staticDuration",
+    "routes.legs.steps.transitDetails",
+])
+ROUTING_PREFS = {"fewer_transfers": "FEWER_TRANSFERS", "less_walking": "LESS_WALKING"}
 
-    Use after picking a restaurant to tell the user how to get there.
+
+def _minutes(duration: str | None) -> int:
+    """Google durations look like "1234s"."""
+    try:
+        return round(int(str(duration).rstrip("s")) / 60)
+    except ValueError:
+        return 0
+
+
+def _in_nyc(place: str) -> str:
+    return place if ("NY" in place or "New York" in place) else f"{place}, New York, NY"
+
+
+def get_subway_trip(origin: str, destination: str, prefer: str = "") -> dict:
+    """Get up to 3 NYC subway route options between two places, fastest first.
+
+    Use after picking a restaurant to tell the user how to get there, or to
+    compare how far away restaurants are. Each option lists total minutes,
+    walking minutes, number of transfers, and each train to take (line,
+    direction, board/exit stations, number of stops).
 
     Args:
-        origin: Where the user is, e.g. "Columbia University" or a street address.
-        destination: The restaurant's address.
+        origin: Where the user is starting, e.g. "Columbia University",
+            "Bedford Ave & N 7th St, Brooklyn", or a full street address.
+        destination: The restaurant's address (use the address from
+            search_restaurants or surprise_pick, not just its name).
+        prefer: Optional. "fewer_transfers" or "less_walking". Leave empty
+            for the fastest route.
     """
-    # TODO: Google Maps Directions API with mode=transit, or MTA data
-    return {"origin": origin, "destination": destination,
-            "lines": ["1"], "minutes": 25, "note": "STUB DATA"}
+    if not origin.strip() or not destination.strip():
+        return {"error": "origin and destination are both required. Ask the user "
+                         "where they are starting from."}
+    prefer = prefer.strip().lower()
+    if prefer and prefer not in ROUTING_PREFS:
+        return {"error": "prefer must be 'fewer_transfers', 'less_walking', or empty."}
+
+    api_key = os.environ.get("GOOGLE_MAPS_API_KEY")
+    if not api_key:
+        return {"error": "Directions are not configured (GOOGLE_MAPS_API_KEY missing). "
+                         "Tell the user directions are unavailable right now."}
+
+    transit_prefs = {"allowedTravelModes": ["SUBWAY"]}
+    if prefer:
+        transit_prefs["routingPreference"] = ROUTING_PREFS[prefer]
+    body = {
+        "origin": {"address": _in_nyc(origin)},
+        "destination": {"address": _in_nyc(destination)},
+        "travelMode": "TRANSIT",
+        "transitPreferences": transit_prefs,
+        "computeAlternativeRoutes": True,
+    }
+    headers = {"X-Goog-Api-Key": api_key, "X-Goog-FieldMask": ROUTES_FIELDS}
+
+    try:
+        resp = requests.post(ROUTES_URL, json=body, headers=headers, timeout=10)
+    except requests.RequestException as e:
+        return {"error": f"Could not reach the directions service ({type(e).__name__}). "
+                         "Try again once; if it fails again, tell the user."}
+    if resp.status_code != 200:
+        try:
+            msg = resp.json()["error"]["message"]
+        except (ValueError, KeyError, TypeError):
+            msg = resp.text[:200]
+        return {"error": f"Directions failed (HTTP {resp.status_code}): {msg}"}
+
+    routes = resp.json().get("routes", [])
+    if not routes:
+        return {"error": f"No subway route found from '{origin}' to '{destination}'. "
+                         "Ask the user for a more specific starting address or cross streets."}
+
+    options = []
+    for route in routes[:3]:
+        trains, walk_min = [], 0
+        for leg in route.get("legs", []):
+            for step in leg.get("steps", []):
+                if step.get("travelMode") == "WALK":
+                    walk_min += _minutes(step.get("staticDuration"))
+                td = step.get("transitDetails")
+                if td:
+                    line = td.get("transitLine", {})
+                    stops = td.get("stopDetails", {})
+                    trains.append({
+                        "line": line.get("nameShort") or line.get("name"),
+                        "direction": td.get("headsign"),
+                        "board_at": stops.get("departureStop", {}).get("name"),
+                        "get_off_at": stops.get("arrivalStop", {}).get("name"),
+                        "stops": td.get("stopCount"),
+                    })
+        options.append({
+            "total_minutes": _minutes(route.get("duration")),
+            "walking_minutes": walk_min,
+            "transfers": max(len(trains) - 1, 0),
+            "trains": trains,
+        })
+    options.sort(key=lambda o: o["total_minutes"])
+
+    result = {"origin": origin, "destination": destination, "options": options}
+    if not options[0]["trains"]:
+        result["note"] = "The best route is walking only; it's close enough to walk."
+    return result
 
 
 # Registry used by agent.py. Add new tools here.
