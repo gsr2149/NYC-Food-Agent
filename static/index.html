@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Bite Buddy NYC</title>
+  <!-- Placeholder UI so you can test. Redesign this: it must look different from the starter. -->
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 700px; margin: 2rem auto; padding: 0 1rem; }
+    #log { border: 1px solid #ccc; border-radius: 8px; padding: 1rem; min-height: 300px; }
+    .user { text-align: right; margin: .5rem 0; }
+    .bot { margin: .5rem 0; white-space: pre-wrap; }
+    details { font-size: .8rem; color: #555; margin: .25rem 0; }
+    form { display: flex; gap: .5rem; margin-top: 1rem; }
+    input { flex: 1; padding: .6rem; }
+  </style>
+</head>
+<body>
+  <h1>🍜 Bite Buddy NYC</h1>
+  <p>Can't decide where to eat? Tell me what you're craving, which borough you're in, and your budget.</p>
+  <div id="log"></div>
+  <form id="f">
+    <input id="msg" placeholder="e.g. cheap ramen near Columbia" autocomplete="off">
+    <button>Send</button>
+  </form>
+<script>
+let sessionId = null;
+const log = document.getElementById("log");
+function add(cls, text) {
+  const d = document.createElement("div"); d.className = cls; d.textContent = text; log.appendChild(d);
+}
+document.getElementById("f").onsubmit = async (e) => {
+  e.preventDefault();
+  const input = document.getElementById("msg");
+  const message = input.value.trim(); if (!message) return;
+  input.value = ""; add("user", message);
+  const res = await fetch("/chat", { method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ message, session_id: sessionId }) });
+  const data = await res.json();
+  if (!res.ok) { add("bot", "Error: " + data.detail); return; }
+  sessionId = data.session_id;
+  for (const t of data.tool_calls) {
+    const d = document.createElement("details");
+    d.innerHTML = `<summary>🔧 ${t.name}</summary><pre></pre>`;
+    d.querySelector("pre").textContent = JSON.stringify({ args: t.args, result: t.result }, null, 2);
+    log.appendChild(d);
+  }
+  add("bot", data.response);
+};
+</script>
+</body>
+</html>
