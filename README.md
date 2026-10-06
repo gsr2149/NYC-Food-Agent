@@ -66,7 +66,7 @@ gcloud run deploy nyc-food-agent \
   --region us-east1 \
   --allow-unauthenticated \
   --max-instances 1 \
-  --set-env-vars GEMINI_API_KEY=YOUR_KEY,GEMINI_MODEL=gemini-2.5-flash
+  --set-env-vars GEMINI_API_KEY=YOUR_KEY,GEMINI_MODEL=gemini-2.5-flash,GOOGLE_MAPS_API_KEY=YOUR_MAPS_KEY
 ```
 
 The command prints a public URL. Redeploy with the same command after changes.

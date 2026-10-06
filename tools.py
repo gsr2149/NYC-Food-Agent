@@ -8,9 +8,13 @@ Every tool returns a dict. On failure, return {"error": "..."} with a message
 that tells the model what to do next (ask the user, retry with other args)
 instead of raising.
 
-The bodies below are STUBS that return fake sample data so you can test the
+Tools marked STUB return fake sample data so you can test the
 chat loop end to end. Replace each TODO with real logic.
 """
+
+import os
+
+import requests
 
 BOROUGHS = ["Manhattan", "Brooklyn", "Queens", "Bronx", "Staten Island"]
 
@@ -21,31 +25,94 @@ def _check_borough(borough: str) -> str | None:
     return None
 
 
-def search_restaurants(cuisine: str, borough: str, max_price_level: int = 4) -> dict:
-    """Search for real NYC restaurants matching a cuisine, borough, and budget.
+PLACES_URL = "https://places.googleapis.com/v1/places:searchText"
+# Only ask Google for the fields we use (cheaper and faster).
+PLACES_FIELDS = ",".join([
+    "places.displayName", "places.formattedAddress", "places.rating",
+    "places.userRatingCount", "places.priceLevel", "places.googleMapsUri",
+    "places.currentOpeningHours.openNow",
+])
+# Our 1-4 scale <-> Google's price enum
+PRICE_ENUMS = {
+    1: "PRICE_LEVEL_INEXPENSIVE", 2: "PRICE_LEVEL_MODERATE",
+    3: "PRICE_LEVEL_EXPENSIVE", 4: "PRICE_LEVEL_VERY_EXPENSIVE",
+}
+PRICE_FROM_ENUM = {v: k for k, v in PRICE_ENUMS.items()}
 
-    Call this once you know at least the cuisine and borough. This tool makes the
-    external API request (e.g. Google Places, Yelp Fusion, or NYC Open Data).
+
+def search_restaurants(cuisine: str, borough: str, max_price_level: int = 4,
+                       near: str = "", open_now: bool = False) -> dict:
+    """Search for real NYC restaurants by cuisine, borough, and budget.
+
+    Call this once you know the cuisine and borough. Returns up to 5 places with
+    name, address, rating, price level (1-4), whether it is open now, and a
+    Google Maps link. Only recommend restaurants that this tool returns.
 
     Args:
-        cuisine: Type of food, e.g. "ramen", "tacos", "Italian".
+        cuisine: Type of food, e.g. "ramen", "tacos", "Italian", "brunch".
         borough: One of Manhattan, Brooklyn, Queens, Bronx, Staten Island.
-        max_price_level: Highest price level to include, 1 ($) to 4 ($$$$).
+        max_price_level: Highest price level to include: 1 ($), 2 ($$),
+            3 ($$$), 4 ($$$$). Use 4 if the user has no budget limit.
+        near: Optional neighborhood or landmark to search around, e.g.
+            "Columbia University", "Williamsburg", "Union Square".
+        open_now: True to only return places that are open right now.
     """
     if err := _check_borough(borough):
         return {"error": err}
-    if not 1 <= max_price_level <= 4:
-        return {"error": "max_price_level must be 1-4. Ask the user for their budget."}
-    # TODO: call a real API with requests.get(..., timeout=10) and catch
-    # requests.RequestException -> return {"error": "...try again or ..."}
-    return {
-        "results": [
-            {"name": f"Sample {cuisine.title()} Spot", "borough": borough,
-             "price_level": min(2, max_price_level), "rating": 4.5,
-             "address": "123 Example St"},
-        ],
-        "note": "STUB DATA - replace with a real API call.",
+    if max_price_level not in PRICE_ENUMS:
+        return {"error": "max_price_level must be 1, 2, 3, or 4. Ask the user for their budget."}
+    borough = borough.strip().title()
+    if not cuisine.strip():
+        return {"error": "cuisine is empty. Ask the user what they want to eat, or call suggest_cuisines."}
+
+    api_key = os.environ.get("GOOGLE_MAPS_API_KEY")
+    if not api_key:
+        return {"error": "Restaurant search is not configured (GOOGLE_MAPS_API_KEY missing). "
+                         "Tell the user search is unavailable right now."}
+
+    where = f"near {near}, {borough}" if near.strip() else f"in {borough}"
+    body = {
+        "textQuery": f"{cuisine} restaurants {where}, New York, NY",
+        "includedType": "restaurant",
+        "priceLevels": [PRICE_ENUMS[p] for p in range(1, max_price_level + 1)],
+        "openNow": open_now,
+        "maxResultCount": 5,
     }
+    headers = {"X-Goog-Api-Key": api_key, "X-Goog-FieldMask": PLACES_FIELDS}
+
+    try:
+        resp = requests.post(PLACES_URL, json=body, headers=headers, timeout=10)
+    except requests.RequestException as e:
+        return {"error": f"Could not reach the restaurant search service ({type(e).__name__}). "
+                         "Try again once; if it fails again, tell the user."}
+    if resp.status_code != 200:
+        try:
+            msg = resp.json()["error"]["message"]
+        except (ValueError, KeyError, TypeError):
+            msg = resp.text[:200]
+        return {"error": f"Restaurant search failed (HTTP {resp.status_code}): {msg}"}
+
+    places = resp.json().get("places", [])
+    if not places:
+        return {"results": [], "message": (
+            f"No {cuisine} restaurants found {where} at that budget"
+            f"{' that are open now' if open_now else ''}. Suggest a higher budget, "
+            "a nearby borough, or a different cuisine.")}
+
+    results = []
+    for p in places:
+        level = PRICE_FROM_ENUM.get(p.get("priceLevel"))
+        results.append({
+            "name": p.get("displayName", {}).get("text"),
+            "address": p.get("formattedAddress"),
+            "rating": p.get("rating"),
+            "review_count": p.get("userRatingCount"),
+            "price_level": level,  # 1-4, or None if Google doesn't know
+            "price": "$" * level if level else "unknown",
+            "open_now": p.get("currentOpeningHours", {}).get("openNow"),
+            "maps_url": p.get("googleMapsUri"),
+        })
+    return {"query": body["textQuery"], "results": results}
 
 
 def surprise_pick(borough: str, max_price_level: int = 4) -> dict:
