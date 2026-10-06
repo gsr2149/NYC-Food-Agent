@@ -13,6 +13,7 @@ chat loop end to end. Replace each TODO with real logic.
 """
 
 import os
+import random
 
 import requests
 
@@ -115,20 +116,65 @@ def search_restaurants(cuisine: str, borough: str, max_price_level: int = 4,
     return {"query": body["textQuery"], "results": results}
 
 
-def surprise_pick(borough: str, max_price_level: int = 4) -> dict:
-    """Pick ONE random restaurant for a user who can't decide.
+SURPRISE_CUISINES = [
+    "ramen", "pizza", "tacos", "dumplings", "Thai", "Indian", "Korean BBQ",
+    "Ethiopian", "Middle Eastern", "Vietnamese", "Italian", "sushi", "bagels",
+    "Caribbean", "Greek", "dim sum", "burgers", "Mexican", "Sichuan", "Georgian",
+]
+MIN_SURPRISE_RATING = 4.0
+MIN_SURPRISE_REVIEWS = 50
+MAX_SURPRISE_TRIES = 3
 
-    Use when the user says something like "just pick for me" or "surprise me".
+
+def surprise_pick(borough: str, max_price_level: int = 4, near: str = "",
+                  exclude_cuisines: list[str] | None = None,
+                  open_now: bool = False) -> dict:
+    """Decide for an indecisive user: pick ONE random, well-rated restaurant.
+
+    Use when the user says "just pick", "surprise me", "I don't care", or
+    can't choose. Picks a random cuisine, searches real restaurants, and returns
+    a single place rated 4.0+ with 50+ reviews. Call again for a re-roll,
+    adding the cuisine they rejected to exclude_cuisines.
 
     Args:
         borough: One of Manhattan, Brooklyn, Queens, Bronx, Staten Island.
-        max_price_level: Highest price level to include, 1 ($) to 4 ($$$$).
+        max_price_level: Highest price level to include: 1 ($) to 4 ($$$$).
+        near: Optional neighborhood or landmark, e.g. "Union Square".
+        exclude_cuisines: Cuisines the user doesn't want or already rejected,
+            e.g. ["pizza", "sushi"].
+        open_now: True to only pick places that are open right now.
     """
     if err := _check_borough(borough):
         return {"error": err}
-    # TODO: e.g. choose a random cuisine, call search_restaurants, random.choice
-    return {"pick": {"name": "Sample Surprise Diner", "borough": borough},
-            "note": "STUB DATA"}
+    excluded = {c.strip().lower() for c in (exclude_cuisines or [])}
+    options = [c for c in SURPRISE_CUISINES if c.lower() not in excluded]
+    if not options:
+        return {"error": "Every cuisine is excluded. Ask the user which cuisine "
+                         "they would be OK with, then call search_restaurants."}
+
+    tried = []
+    for cuisine in random.sample(options, min(MAX_SURPRISE_TRIES, len(options))):
+        tried.append(cuisine)
+        found = search_restaurants(cuisine, borough, max_price_level, near, open_now)
+        if "error" in found:
+            return found  # e.g. bad key or network down; trying more won't help
+        good = [r for r in found["results"]
+                if (r["rating"] or 0) >= MIN_SURPRISE_RATING
+                and (r["review_count"] or 0) >= MIN_SURPRISE_REVIEWS]
+        if good:
+            pick = random.choice(good)
+            return {
+                "cuisine": cuisine,
+                "pick": pick,
+                "why": f"Rated {pick['rating']} by {pick['review_count']} people, "
+                       f"randomly chosen from {len(good)} solid {cuisine} spots.",
+                "tip": "If the user isn't feeling it, call surprise_pick again "
+                       f"with '{cuisine}' added to exclude_cuisines.",
+            }
+
+    return {"error": f"Couldn't find a well-rated spot for {', '.join(tried)} "
+                     f"in {borough} at price level <= {max_price_level}. Suggest "
+                     "raising the budget, turning off open_now, or another borough."}
 
 
 def estimate_total_cost(price_level: int, party_size: int = 1,
