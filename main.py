@@ -9,7 +9,7 @@ from fastapi.responses import FileResponse  # noqa: E402
 from fastapi.staticfiles import StaticFiles  # noqa: E402
 from pydantic import BaseModel  # noqa: E402
 
-from agent import run_turn  # noqa: E402
+from app import run_turn  
 
 app = FastAPI(title="NYC Food Agent")
 app.mount("/static", StaticFiles(directory="static"), name="static")
