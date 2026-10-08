@@ -5,7 +5,7 @@ NYC Food Hunter is an agent that will cure your indecisiveness when searching fo
 
 ## Installation
 
-**Requirements:** Python 3.10+, a free Gemini API key, and a Google Maps API key.
+**Requirements:** Python 3.10, a Gemini API key, and a Google Maps API key.
 
 1. Clone the repo
    ```bash
@@ -21,8 +21,8 @@ pip install -r requirements.txt
 cp .env.example .env
 
 4. Open .env and fill in 
-GEMINI_API_KEY: get one at https://aistudio.google.com/apikey
-GOOGLE_MAPS_API: create youur own in Google Cloud Console with Places API(New) and make sure it is enabled
+**GEMINI_API_KEY: get one at https://aistudio.google.com/apikey
+**GOOGLE_MAPS_API: create your own in Google Cloud Console with Places API(New) and make sure it is enabled
 
 5. Start the app 
 python -m uvicorn main:app --port 8080 
