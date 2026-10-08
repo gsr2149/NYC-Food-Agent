@@ -1,0 +1,13 @@
+[project]
+name = "nyc-food-agent"
+version = "0.1.0"
+description = "NYC Food Hunter: an agent that recommends NYC restaurants using Gemini and the Google Places API"
+requires-python = ">=3.10"
+authors = [{ name = "Gabriella Rich" }]
+dependencies = [
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.30",
+    "google-genai>=1.0",
+    "requests>=2.32",
+    "python-dotenv>=1.0",
+]

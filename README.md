@@ -31,11 +31,10 @@ open http://localhost:8080
 ## Tools 
 | Tool | Usage |
 |- - -|- - -|
-| `_check_borough`: Uses the Places API to check the location of the user |
-| `search_restaurants`: Sends the user's preferences to Places API as text search and returns up to five matching restaurants|
-| `surprise_pick`: Unique tool that has a set amount of cuisines and decides for a user that is unsure where they want to go |
-| `estimate_total_cost`: Calculates an estimate of how much the meal might be and depends on user prompts to be called asking for prices | 
-| `suggest_cuisines`: Similar to the `surprise_pick` tool that works to suggest food based off the user's mood |
+| `search_restaurants` |: Sends the user's preferences to Places API as text search and returns up to five matching restaurants|
+| `surprise_pick` |: Unique tool that has a set amount of cuisines and decides for a user that is unsure where they want to go |
+| `estimate_total_cost` |: Calculates an estimate of how much the meal might be and depends on user prompts to be called asking for prices | 
+| `suggest_cuisines` |: Similar to the `surprise_pick` tool that works to suggest food based off the user's mood |
 
 ## How To Use
 Made for ease of use, just start the conversation with the agent once everything is loaded properly. If you are unsure of what to say, feel free to use the little discussion prompts to get a conversation started!
