@@ -1,80 +1,48 @@
-# Bite Buddy NYC 🍜
+# NYC Food Hunter 
 
-A chat agent for young, indecisive NYC diners. It asks what you're craving,
-which borough you're in, your budget and where you're starting from, then
-finds a place and tells you how to get there.
+NYC Food Hunter is an agent that will cure your indecisiveness when searching for food in NYC. With so many options, it is hard to choose but whether you are craving something specific or just want to be surpised, NYC Food Hunter can give you an answer. 
 
-## Project layout
 
-| File | What it does |
-|---|---|
-| `main.py` | FastAPI server. `POST /chat` returns `{response, session_id, tool_calls}`; `GET /` serves the UI |
-| `agent.py` | Gemini chat loop: system prompt, per-session memory, runs tools and records each call |
-| `tools.py` | The 5 tools (**stubs with fake data for now**). Add new tools to the `TOOLS` registry at the bottom |
-| `static/index.html` | Placeholder UI that shows tool calls. Redesign it |
-| `Dockerfile` | Container image for Cloud Run |
+## Installation
 
-## 1. Run locally
+**Requirements:** Python 3.10+, a free Gemini API key, and a Google Maps API key.
 
-```bash
-python3 -m venv .venv && source .venv/bin/activate
+1. Clone the repo
+   ```bash
+   git clone https://github.com/gsr2149/nyc-food-agent.git
+   cd nyc-food-agent
+
+2. Create your virtual environment and install dependencies
+python3 -m venv .venv
+source .venv/bin/activate  
 pip install -r requirements.txt
-cp .env.example .env        # then paste your key from https://aistudio.google.com/apikey
-uvicorn main:app --reload --port 8080
-```
 
-Open http://localhost:8080 and try "I want cheap ramen in Manhattan".
+3. Add your API Keys
+cp .env.example .env
 
-Test the API directly:
+4. Open .env and fill in 
+GEMINI_API_KEY: get one at https://aistudio.google.com/apikey
+GOOGLE_MAPS_API: create youur own in Google Cloud Console with Places API(New) and make sure it is enabled
 
-```bash
-curl -X POST localhost:8080/chat -H 'content-type: application/json' \
-  -d '{"message": "surprise me in Brooklyn"}'
-# send the returned session_id with the next message to keep the conversation
-```
+5. Start the app 
+python -m uvicorn main:app --port 8080 
+open http://localhost:8080
 
-## 2. Replace the stubs, one tool at a time
+## Tools 
+| Tool | Usage |
+|- - -|- - -|
+| `_check_borough`: Uses the Places API to check the location of the user |
+| `search_restaurants`: Sends the user's preferences to Places API as text search and returns up to five matching restaurants|
+| `surprise_pick`: Unique tool that has a set amount of cuisines and decides for a user that is unsure where they want to go |
+| `estimate_total_cost`: Calculates an estimate of how much the meal might be and depends on user prompts to be called asking for prices | 
+| `suggest_cuisines`: Similar to the `surprise_pick` tool that works to suggest food based off the user's mood |
 
-Ideas for real data sources:
+## How To Use
+Made for ease of use, just start the conversation with the agent once everything is loaded properly. If you are unsure of what to say, feel free to use the little discussion prompts to get a conversation started!
 
-- `search_restaurants` / `surprise_pick`: Google Places API (Text Search), Yelp
-  Fusion, or NYC Open Data's restaurant inspection dataset (free, no key).
-- `get_subway_trip`: Google Maps Directions API with `mode=transit`.
-- `estimate_total_cost`, `suggest_cuisines`: pure Python, no API needed.
-
-Rules from lecture to keep:
-
-- The docstring and argument descriptions are what the model reads, so make them clear.
-- Don't raise. Return `{"error": "<what went wrong + what to do>"}`.
-- Always use `timeout=` on HTTP requests and catch `requests.RequestException`.
-
-## 3. Deploy to Cloud Run
-
-One-time setup:
-
-```bash
-gcloud auth login
-gcloud config set project YOUR_PROJECT_ID
-gcloud services enable run.googleapis.com cloudbuild.googleapis.com artifactregistry.googleapis.com
-```
-
-Deploy from source. Cloud Build uses the Dockerfile:
-
-```bash
-gcloud run deploy nyc-food-agent \
-  --source . \
-  --region us-east1 \
-  --allow-unauthenticated \
-  --max-instances 1 \
-  --set-env-vars GEMINI_API_KEY=YOUR_KEY,GEMINI_MODEL=gemini-2.5-flash,GOOGLE_MAPS_API_KEY=YOUR_MAPS_KEY
-```
-
-The command prints a public URL. Redeploy with the same command after changes.
-
-> **Why `--max-instances 1`?** Conversation memory lives in a Python dict in
-> one container. If Cloud Run started a second instance, a user could land on
-> it and lose their history. One instance is fine for a class project.
-> Memory also resets on redeploy or when an idle instance shuts down.
-
-For a cleaner setup, store the key in Secret Manager and pass
-`--set-secrets GEMINI_API_KEY=gemini-key:latest` instead of `--set-env-vars`.
+## Prompts for Testing/Grading the Agent and Activating Diffferent Tool Calls
+1. "Where can I find cheap Thai food near the Financial District? 
+2. "Can you pick something for me?" 
+3. "Recommend a Japanese restaurant that is in Jersey City" (this one shouldn't work andf will bring up an error as this agent is localized to NYC area only)
+4. "How much would a 2 person dinner at Izakaya Mew cost?" (have to tell the agent the price worth in $ amount first of the given restaurant)
+5. "Any ideas on a cozy meal?" 

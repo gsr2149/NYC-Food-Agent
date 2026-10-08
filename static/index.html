@@ -4,11 +4,12 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>NYC Food Hunter</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=Lato:wght@400;700&display=swap" rel="stylesheet">
   <style>
     body { font-family: "Lato", sans-serif; max-width: 700px; margin: 2rem auto; padding: 0 1rem 6rem; background: #81D4FA; color: black; }
+    
     h1, h1 + p { text-align: center; }
     
     #log { border: 1px solid #ccc; border-radius: 8px; padding: 1rem; min-height: 300px; background: #E1F5FE; }
@@ -54,17 +55,60 @@
       padding: .45rem 1rem;
       background: #E1F5FE; border: 1px solid #ccc; color: black;
       font-size: .9rem; font-weight: 400;
-      text-transform: none; letter-spacing: normal;   /* undo the SEND button styling */
+      text-transform: none; letter-spacing: normal;   
       cursor: pointer;
     }
     .chip:hover { background: white; }
-
-    /* Prompt box, Send button and bubbles use the same font as the agent's answers */
+    
     input, button { font-family: "Lora", Georgia, serif; }
+       
+    .side {
+      position: fixed; top: 2rem; bottom: 2rem;
+      width: calc((100vw - 700px) / 2 - 3rem); max-width: 260px;
+      display: flex; flex-direction: column; justify-content: center; gap: 1rem;
+    }
+    .side.left  { right: calc(50% + 350px + 1.5rem); }
+    .side.right { left:  calc(50% + 350px + 1.5rem); }
+    .side img {
+      width: 100%; flex: 1; min-height: 0;
+      object-fit: cover;                 /* crop to fill without stretching */
+      border-radius: 16px;
+      box-shadow: 0 6px 18px rgba(13, 59, 102, .18);
+    }
+
+    /* Hide the photos when the window is too narrow (phones, small laptops) */
+    @media (max-width: 1100px) { .side { display: none; } }
+        /* Title spacing + divider line underneath */
+    h1 {
+      text-align: center;
+      margin: 2.5rem 0 0;
+    }
+    h1::after {
+      content: "";
+      display: block;
+      width: 80px; height: 2px;
+      background: #0D3B66;          /* navy line; use black if you prefer */
+      opacity: .6;
+      margin: 1.25rem auto 2rem;    /* space above the line, then space before the chat box */
+    }
+        .toolbar { display: flex; justify-content: flex-end; margin-bottom: .5rem; }
   </style>
 </head>
 <body>
+    <aside class="side left">
+    <img src="/static/images/indian.png" alt="Indian curries with naan and rice">
+    <img src="/static/images/thai.png" alt="Thai dishes on a table">
+    <img src="/static/images/sushi.png" alt="Sushi platter">
+  </aside>
+  <aside class="side right">
+    <img src="/static/images/italian.png" alt="Pizza, steak and pasta">
+    <img src="/static/images/cafe.png" alt="Cozy NYC restaurant interior">
+    <img src="/static/images/tacos.png" alt="Restaurant dish">
+  </aside>
   <h1>NYC Food Hunter</h1>
+    <div class="toolbar">
+    <button type="button" id="newChat">New chat</button>
+  </div>
     <div id="log">
     <div id="welcome">
       <p>Can't decide where to eat? Tell me what you're craving, which borough you're in, and your budget.</p>
@@ -83,11 +127,23 @@
 <script>
 let sessionId = null;
 const log = document.getElementById("log");
+let chatId = 0;                       
+const startHTML = log.innerHTML;     
+
+document.getElementById("newChat").onclick = () => {
+  chatId++;                          
+  sessionId = null;                   
+  log.innerHTML = startHTML;          
+  const input = document.getElementById("msg");
+  input.value = "";
+  input.focus();
+};
 function add(cls, text) {
   const d = document.createElement("div"); d.className = cls; d.textContent = text; log.appendChild(d);
 }
 document.getElementById("f").onsubmit = async (e) => {
   e.preventDefault();
+    const myChat = chatId;
   const input = document.getElementById("msg");
   const message = input.value.trim(); if (!message) return;
   document.getElementById("welcome")?.remove();
@@ -95,6 +151,7 @@ document.getElementById("f").onsubmit = async (e) => {
   const res = await fetch("/chat", { method: "POST", headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ message, session_id: sessionId }) });
   const data = await res.json();
+    if (myChat !== chatId) return;  
   if (!res.ok) { add("bot", "Error: " + data.detail); return; }
   sessionId = data.session_id;
   for (const t of data.tool_calls) {

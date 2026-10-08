@@ -31,5 +31,10 @@ def chat(req: ChatRequest):
     try:
         reply, tool_calls = run_turn(session_id, req.message)
     except Exception as e:
+        if "RESOURCE_EXHAUSTED" in str(e) or "429" in str(e):
+            raise HTTPException(
+                status_code=429,
+                detail="I've reached my daily limit for recommendations. Please try again later.",
+            )
         raise HTTPException(status_code=500, detail=str(e))
     return {"response": reply, "session_id": session_id, "tool_calls": tool_calls}
