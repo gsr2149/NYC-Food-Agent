@@ -8,33 +8,41 @@ NYC Food Hunter is an agent that will cure your indecisiveness when searching fo
 **Requirements:** Python 3.10, a Gemini API key, and a Google Maps API key.
 
 1. Clone the repo
-   ```bash
-   git clone https://github.com/gsr2149/nyc-food-agent.git
-   cd nyc-food-agent
+  ```bash
+  git clone https://github.com/gsr2149/nyc-food-agent.git
+  cd nyc-food-agent
+  ```
 
 2. Create your virtual environment and install dependencies
+```bash
 python3 -m venv .venv
 source .venv/bin/activate  
 pip install -r requirements.txt
+```
+
 
 3. Add your API Keys
+```bash
 cp .env.example .env
+```
 
 4. Open .env and fill in 
-**GEMINI_API_KEY: get one at https://aistudio.google.com/apikey
-**GOOGLE_MAPS_API: create your own in Google Cloud Console with Places API(New) and make sure it is enabled
+* GEMINI_API_KEY: get one at https://aistudio.google.com/apikey
+* GOOGLE_MAPS_API: create your own in Google Cloud Console with Places API(New) and make sure it is enabled
 
 5. Start the app 
+```bash
 python -m uvicorn main:app --port 8080 
 open http://localhost:8080
+```
 
 ## Tools 
 | Tool | Usage |
-|- - -|- - -|
-| `search_restaurants` |: Sends the user's preferences to Places API as text search and returns up to five matching restaurants|
-| `surprise_pick` |: Unique tool that has a set amount of cuisines and decides for a user that is unsure where they want to go |
-| `estimate_total_cost` |: Calculates an estimate of how much the meal might be and depends on user prompts to be called asking for prices | 
-| `suggest_cuisines` |: Similar to the `surprise_pick` tool that works to suggest food based off the user's mood |
+| ----- | -------------- |
+| `search_restaurants` | Sends the user's preferences to Places API as text search and returns up to five matching restaurants|
+| `surprise_pick` | Unique tool that has a set amount of cuisines and decides for a user that is unsure where they want to go |
+| `estimate_total_cost` | Calculates an estimate of how much the meal might be and depends on user prompts to be called asking for prices | 
+| `suggest_cuisines` | Similar to the `surprise_pick` tool that works to suggest food based off the user's mood |
 
 ## How To Use
 Made for ease of use, just start the conversation with the agent once everything is loaded properly. If you are unsure of what to say, feel free to use the little discussion prompts to get a conversation started!
